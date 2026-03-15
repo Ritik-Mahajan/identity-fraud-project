@@ -1,0 +1,62 @@
+employer_name,employer_industry
+Walmart,retail
+Target,retail
+Costco,retail
+Home Depot,retail
+Best Buy,retail
+CVS Health,retail
+Walgreens,retail
+Amazon,technology
+Google,technology
+Microsoft,technology
+Apple,technology
+Meta,technology
+IBM,technology
+Oracle,technology
+Salesforce,technology
+Cisco Systems,technology
+Intel Corporation,technology
+Dell Technologies,technology
+Kaiser Permanente,healthcare
+UnitedHealth Group,healthcare
+CVS Health,healthcare
+HCA Healthcare,healthcare
+Ascension Health,healthcare
+Community Health Systems,healthcare
+Mayo Clinic,healthcare
+Cleveland Clinic,healthcare
+JPMorgan Chase,finance
+Bank of America,finance
+Wells Fargo,finance
+Citigroup,finance
+Goldman Sachs,finance
+Morgan Stanley,finance
+Capital One,finance
+American Express,finance
+State Farm,insurance
+Allstate,insurance
+Progressive,insurance
+Liberty Mutual,insurance
+Nationwide,insurance
+UPS,logistics
+FedEx,logistics
+DHL,logistics
+XPO Logistics,logistics
+JB Hunt,logistics
+University of California,education
+State University System,education
+Community College District,education
+Public School District,education
+Private Academy,education
+Marriott International,hospitality
+Hilton Hotels,hospitality
+Hyatt Hotels,hospitality
+MGM Resorts,hospitality
+Starbucks,hospitality
+McDonalds,hospitality
+General Motors,manufacturing
+Ford Motor Company,manufacturing
+Boeing,manufacturing
+Caterpillar,manufacturing
+3M Company,manufacturing
+General Electric,manufacturing

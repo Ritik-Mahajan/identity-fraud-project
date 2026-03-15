@@ -1,0 +1,5 @@
+stage,time_seconds,time_per_sample_ms,notes
+Stage 1 Model Load,0.04292917251586914,0.008585834503173828,LightGBM model loading
+Stage 2 Combined Model Load,0.000209808349609375,4.1961669921875e-05,Logistic Regression combiner loading
+Encoder Feature Generation (estimate),5.8500000000000005,50.0,Estimated for 117 borderline cases using MiniLM
+Total Stage 2 Overhead (estimate),5.85020980834961,50.00179323375735,Encoder + combined model for borderline cases

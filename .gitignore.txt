@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store
+.model_cache/
+
+data/raw/
+data/interim/
+data/processed/
+models/
+
+*.pyc
+*.pyo
