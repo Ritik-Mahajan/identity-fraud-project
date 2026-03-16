@@ -80,7 +80,6 @@ Real fraud data is:
 Synthetic data allows:
 - Full control over fraud patterns and difficulty
 - Reproducible experiments
-- Shareable, interview-ready project
 
 ### Dataset Specifications
 
@@ -235,7 +234,6 @@ identity-fraud-project/
 │   └── lightgbm_model.pkl  # Production model
 ├── reports/
 │   ├── final_project_summary.md
-│   ├── interview_talking_points.md
 │   ├── project_interpretation.md
 │   └── slides/
 └── requirements.txt
@@ -300,21 +298,11 @@ python src/validate_models.py
 1. **Larger dataset** (50K-100K rows) with more borderline cases
 2. **Richer text simulation** with realistic OCR errors
 3. **Alternative encoders** (E5, BGE, domain-specific)
-4. **Cost-sensitive evaluation** (different costs for FP vs FN)
-5. **Real data validation** if available
+4. **Training the Encoders**
+5. **Cost-sensitive evaluation** (different costs for FP vs FN)
+6. **Real data validation** if available
 
 See `reports/future_improvements.md` for detailed roadmap.
-
----
-
-## Interview Resources
-
-| Document | Purpose |
-|----------|---------|
-| `reports/interview_talking_points.md` | Comprehensive interview prep |
-| `reports/final_project_summary.md` | Executive summary |
-| `reports/slides/final_presentation_outline.md` | Presentation structure |
-| `reports/executive_summary_one_page.md` | Quick reference |
 
 ---
 
