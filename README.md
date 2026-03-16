@@ -234,8 +234,7 @@ identity-fraud-project/
 │   └── lightgbm_model.pkl  # Production model
 ├── reports/
 │   ├── final_project_summary.md
-│   ├── project_interpretation.md
-│   └── slides/
+│   └── project_interpretation.md
 └── requirements.txt
 ```
 
