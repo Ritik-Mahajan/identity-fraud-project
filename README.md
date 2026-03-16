@@ -1,39 +1,219 @@
-# Selective Encoder-Enhanced Identity Fraud Detection for Application Risk
+# Selective Encoder-Enhanced Identity Fraud Detection
 
 ## Project Overview
 
-This project builds and evaluates a **two-stage fraud detection system** for application/identity fraud. The hypothesis was that lightweight text/encoder features could improve fraud detection on borderline cases where a structured model is uncertain.
+A production-oriented fraud detection system that tests whether lightweight text/encoder features can improve fraud detection on borderline cases where structured models are uncertain.
 
-**Key Finding**: The structured model alone achieves **99.5% ROC-AUC**, and adding text features provides no incremental value. This is a valid negative result that demonstrates rigorous experimental methodology.
+**Key Result**: The structured model achieves **99.5% ROC-AUC**. Text features provide **no incremental value**—a valid negative result demonstrating rigorous experimental methodology.
 
-## Quick Results
+---
 
-| Model | Test ROC-AUC | Test PR-AUC | Precision | Recall |
-|-------|--------------|-------------|-----------|--------|
-| **LightGBM (Stage 1)** | **0.995** | **0.974** | **96.7%** | **89.0%** |
-| Borderline Routed | 0.993 | 0.966 | 96.7% | 89.0% |
-| Combined (All Cases) | 0.957 | 0.948 | 96.7% | 89.0% |
+## Business Problem
 
-**Recommendation**: Use Stage 1 (LightGBM) alone. The two-stage architecture adds complexity without improving performance.
+**Application fraud** costs financial institutions billions annually. Fraudsters submit fake or stolen identities to open accounts, obtain credit, or commit other financial crimes.
 
-## System Architecture
+**The Challenge**:
+- Detect fraud with high precision (minimize false positives that frustrate legitimate customers)
+- Maintain high recall (catch as much fraud as possible)
+- Handle ambiguous cases where signals are mixed
+
+**Why This Matters**:
+- A 1% improvement in fraud detection can save millions at scale
+- False positives create customer friction and operational costs
+- Borderline cases require the most manual review—automating these decisions has high ROI
+
+---
+
+## Project Architecture
 
 ```
-Application → Stage 1 (LightGBM) → Confidence Check
-                                       ↓
-                   High Confidence → Use Stage 1 prediction (97.7% of cases)
-                   Low Confidence  → Stage 2 (Text) → Combined prediction (2.3%)
+┌─────────────────────────────────────────────────────────────┐
+│                      NEW APPLICATION                         │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 STAGE 1: STRUCTURED MODEL                    │
+│                                                              │
+│  • 23 engineered features (velocity, tenure, risk flags)    │
+│  • LightGBM classifier                                       │
+│  • 99.5% ROC-AUC, 96.7% precision, 89% recall               │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │  CONFIDENT?     │
+                    │  Score < 0.01   │
+                    │  or > 0.99?     │
+                    └─────────────────┘
+                     /              \
+                   YES              NO
+                   /                  \
+                  ▼                    ▼
+    ┌──────────────────┐    ┌──────────────────────────┐
+    │ USE STAGE 1      │    │ STAGE 2: TEXT ANALYSIS   │
+    │ (97.7% of cases) │    │ (2.3% of cases)          │
+    └──────────────────┘    │                          │
+                            │ • MiniLM encoder         │
+                            │ • OCR similarity         │
+                            │ • Keyword detection      │
+                            │ • Combined decision      │
+                            └──────────────────────────┘
 ```
+
+**Why Two Stages?**
+- Stage 1 handles clear-cut cases efficiently
+- Stage 2 applies expensive text analysis only where needed
+- Borderline routing limits computational cost and potential noise
+
+---
+
+## Dataset Design
+
+### Why Synthetic Data?
+
+Real fraud data is:
+- Highly sensitive (PII, regulatory constraints)
+- Imbalanced (often <1% fraud)
+- Proprietary (not shareable for portfolio projects)
+
+Synthetic data allows:
+- Full control over fraud patterns and difficulty
+- Reproducible experiments
+- Shareable, interview-ready project
+
+### Dataset Specifications
+
+| Attribute | Value |
+|-----------|-------|
+| Total Applications | 5,000 |
+| Fraud Rate | 12% |
+| Time Span | 12 months |
+| Train/Val/Test Split | 70%/15%/15% (time-based) |
+
+### Fraud Archetypes
+
+| Type | % of Data | Description |
+|------|-----------|-------------|
+| Legitimate Clean | 70% | Normal applications, consistent data |
+| Legitimate Noisy | 18% | Real customers with messy data (recent moves, typos) |
+| Synthetic Identity | 5% | Fabricated identities, stitched-together data |
+| True-Name Fraud | 4% | Real identity, fraudulent intent |
+| Coordinated Attack | 3% | Organized fraud rings, shared infrastructure |
+
+---
+
+## Phase Summary
+
+| Phase | Description | Key Output |
+|-------|-------------|------------|
+| 1-3 | Project setup, dataset design, source dictionaries | Design docs, lookup files |
+| 4 | Synthetic data generator | 5,000 applications |
+| 5 | Data quality / EDA | Cleaned dataset |
+| 6 | Feature engineering | 23 structured features |
+| 7 | Baseline models | LightGBM (0.995 ROC-AUC) |
+| 8 | Borderline band definition | 117 uncertain cases identified |
+| 9 | Encoder/text features | 12 text-based features |
+| 10 | Combined model | Ablation study |
+| 11 | Validation | Comprehensive evaluation |
+| 12 | Interpretation | Final conclusions |
+
+---
+
+## Models Used
+
+### Stage 1: Structured Models
+
+| Model | Test ROC-AUC | Test PR-AUC | Notes |
+|-------|--------------|-------------|-------|
+| **LightGBM** | **0.995** | **0.974** | **Selected for production** |
+| XGBoost | 0.992 | 0.960 | Close second |
+| Logistic Regression | 0.988 | 0.944 | Interpretable baseline |
+
+### Stage 2: Text/Encoder Model
+
+| Component | Description |
+|-----------|-------------|
+| Encoder | all-MiniLM-L6-v2 (sentence-transformers) |
+| Features | OCR similarity, consistency scores, keyword counts |
+| Combiner | Logistic Regression on Stage 1 score + text features |
+
+---
+
+## Validation Approach
+
+### Ablation Study
+
+Tested four configurations to isolate the value of each component:
+
+| Setup | ROC-AUC | Verdict |
+|-------|---------|---------|
+| Structured Only | 0.995 | **Best** |
+| Text Only | 0.818 | Weak alone |
+| Combined (All Cases) | 0.957 | **Hurts performance** |
+| Borderline Routed | 0.993 | Preserves performance |
+
+### Additional Validation
+
+- **Threshold analysis**: Precision/recall at multiple operating points
+- **Calibration**: Brier score and calibration curves
+- **Stability**: Performance across time periods
+- **Runtime**: Latency measurements for production feasibility
+
+---
+
+## Key Findings
+
+### 1. Structured Features Capture Most Signal
+
+The engineered features are highly discriminative:
+- `high_identity_reuse_flag`: 67% fraud rate when true vs 1.4% when false
+- `high_device_velocity_flag`: Appears only in fraud cases
+- `night_application_flag`: 7x more common in fraud
+
+### 2. Text Features Add No Incremental Value
+
+- Adding text to all cases **decreases** ROC-AUC from 0.995 to 0.957
+- Even on borderline cases, combined model shows no improvement
+- Text features are correlated with structured features (redundant signal)
+
+### 3. Borderline Routing Is the Safest Architecture
+
+If text must be used:
+- Apply only to uncertain cases (2.3% of traffic)
+- Limits potential "damage" from noisy features
+- Preserves most of Stage 1 performance (0.993 vs 0.995)
+
+### 4. Strong Baselines Make Improvement Hard
+
+With 99.5% ROC-AUC:
+- Only 14 errors on 835 test cases
+- Very little room for improvement
+- Small borderline set (45 test cases) limits statistical power
+
+---
+
+## Final Conclusion
+
+**Recommendation: Use Stage 1 (LightGBM) alone.**
+
+The two-stage architecture adds complexity without improving performance. This is a valuable finding:
+- Demonstrates that strong feature engineering can eliminate the need for complex NLP
+- Shows disciplined experimental methodology
+- Proves that "more features" doesn't always mean "better model"
+
+**The methodology is transferable** to any problem where you need to validate whether added complexity provides value.
+
+---
 
 ## Project Structure
 
 ```
 identity-fraud-project/
 ├── data/
-│   ├── external/          # Source dictionaries for data generation
-│   ├── raw/               # Generated raw dataset
-│   ├── interim/           # Intermediate data
-│   └── processed/         # Final processed datasets
+│   ├── external/           # Source dictionaries
+│   ├── raw/                # Generated raw data
+│   └── processed/          # Final datasets
 ├── notebooks/
 │   ├── 02_data_generation.ipynb
 │   ├── 03_eda.ipynb
@@ -45,7 +225,6 @@ identity-fraud-project/
 │   └── 09_model_validation.ipynb
 ├── src/
 │   ├── data_generation.py
-│   ├── data_quality_checks.py
 │   ├── feature_engineering.py
 │   ├── train_baseline_models.py
 │   ├── define_borderline_band.py
@@ -53,128 +232,98 @@ identity-fraud-project/
 │   ├── train_final_combined_model.py
 │   └── validate_models.py
 ├── models/
-│   ├── lightgbm_model.pkl
-│   ├── logistic_regression.pkl
-│   ├── xgboost_model.pkl
-│   └── final_combined_logistic_regression.pkl
+│   └── lightgbm_model.pkl  # Production model
 ├── reports/
-│   ├── project_interpretation.md      # Detailed interpretation
-│   ├── final_project_summary.md       # Executive summary
-│   ├── interview_talking_points.md    # Interview prep
-│   ├── model_validation_summary.md    # Validation findings
-│   ├── future_improvements.md         # Next steps
-│   ├── tables/                        # CSV metrics
-│   ├── figures/                       # Visualizations
-│   └── slides/                        # Presentation outline
-├── requirements.txt
-└── README.md
+│   ├── final_project_summary.md
+│   ├── interview_talking_points.md
+│   ├── project_interpretation.md
+│   └── slides/
+└── requirements.txt
 ```
 
-## Phase Summary
+---
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| Phase 1 | Project setup | Complete |
-| Phase 2 | Dataset design | Complete |
-| Phase 3 | Source dictionaries | Complete |
-| Phase 4 | Synthetic data generator | Complete |
-| Phase 5 | Data quality / EDA | Complete |
-| Phase 6 | Feature engineering | Complete |
-| Phase 7 | Baseline structured models | Complete |
-| Phase 8 | Borderline band definition | Complete |
-| Phase 9 | Encoder/text features | Complete |
-| Phase 10 | Final combined model | Complete |
-| Phase 11 | Model validation | Complete |
-| Phase 12 | Interpretation / refinement | Complete |
-| Phase 13 | Demo and packaging | Pending |
-
-## Key Findings
-
-### 1. Structured Features Are Sufficient
-
-The engineered features capture most fraud signal:
-- `high_identity_reuse_flag`: 67% fraud rate when true (vs 1.4% when false)
-- `high_device_velocity_flag`: Only appears in fraud cases
-- `night_application_flag`: 7x higher in fraud
-
-### 2. Text Features Provide No Incremental Value
-
-- Adding text to all cases **hurts** performance (0.995 → 0.957 ROC-AUC)
-- Borderline routing preserves performance but doesn't improve it
-- Text features are correlated with structured features
-
-### 3. Ablation Study Results
-
-| Setup | ROC-AUC | Verdict |
-|-------|---------|---------|
-| Structured Only | 0.995 | **Best** |
-| Text Only | 0.818 | Weak |
-| Combined (All) | 0.957 | Hurts |
-| Borderline Routed | 0.993 | Preserves |
-
-## Dataset
-
-- **5,000 applications** with 12% fraud rate
-- **5 fraud archetypes**: legitimate_clean, legitimate_noisy, synthetic_identity, true_name_fraud, coordinated_attack
-- **41 columns** covering identity, address, contact, employment, digital behavior, and text fields
-- **Time-based split**: Train (70%), Validation (15%), Test (15%)
-
-## Getting Started
+## How to Run
 
 ```bash
-# Clone the repository
+# 1. Clone and setup
 git clone <repo-url>
 cd identity-fraud-project
-
-# Create and activate virtual environment
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate
 
-# Install dependencies
+# 2. Install dependencies
 pip install -r requirements.txt
 
-# Run the data generator
+# 3. Generate synthetic data
 python src/data_generation.py
 
-# Train baseline models
+# 4. Run feature engineering
+python src/feature_engineering.py
+
+# 5. Train baseline models
 python src/train_baseline_models.py
 
-# Run validation
+# 6. Generate text features (requires ~80MB model download)
+python src/encoder_features.py
+
+# 7. Train combined model and run ablation
+python src/train_final_combined_model.py
+
+# 8. Run comprehensive validation
 python src/validate_models.py
 ```
 
-## Key Files
+---
 
-| File | Description |
-|------|-------------|
-| `models/lightgbm_model.pkl` | Best Stage 1 model (recommended for production) |
-| `data/processed/final_model_predictions.parquet` | All predictions with ablation study |
-| `reports/project_interpretation.md` | Detailed project interpretation |
-| `reports/interview_talking_points.md` | Interview preparation guide |
-| `notebooks/09_model_validation.ipynb` | Comprehensive validation notebook |
+## Limitations
 
-## Constraints
+### Dataset Limitations
+- **Synthetic data**: Real fraud patterns may differ
+- **Small scale**: 5,000 rows; production systems see millions
+- **Limited text variation**: Template-based generation
 
-- Runs on a **16GB MacBook Air M4**
-- No LLM training from scratch
-- Lightweight tools only (pandas, numpy, scikit-learn, sentence-transformers)
-- Beginner-friendly, modular, well-commented code
+### Methodological Limitations
+- **Single encoder**: Only tested MiniLM
+- **Simple combiner**: Only Logistic Regression for Stage 2
+- **Fixed thresholds**: Did not optimize borderline band
 
-## What I Learned
+### What We Cannot Conclude
+- Text features would never help on any fraud dataset
+- More sophisticated NLP wouldn't improve results
+- Results would hold at production scale
 
-1. **Strong feature engineering can eliminate the need for complex models**
-2. **Ablation studies are essential before adding complexity**
-3. **Negative results are valuable when properly validated**
-4. **Not every problem needs deep learning or NLP**
+---
 
 ## Future Improvements
 
-See `reports/future_improvements.md` for detailed next steps:
-1. Generate larger dataset with more borderline cases
-2. Richer text field simulation
-3. Alternative encoder models
-4. Cost-sensitive evaluation
+1. **Larger dataset** (50K-100K rows) with more borderline cases
+2. **Richer text simulation** with realistic OCR errors
+3. **Alternative encoders** (E5, BGE, domain-specific)
+4. **Cost-sensitive evaluation** (different costs for FP vs FN)
+5. **Real data validation** if available
 
-## License
+See `reports/future_improvements.md` for detailed roadmap.
 
-For educational and research purposes.
+---
+
+## Interview Resources
+
+| Document | Purpose |
+|----------|---------|
+| `reports/interview_talking_points.md` | Comprehensive interview prep |
+| `reports/final_project_summary.md` | Executive summary |
+| `reports/slides/final_presentation_outline.md` | Presentation structure |
+| `reports/executive_summary_one_page.md` | Quick reference |
+
+---
+
+## Author
+
+Built as a portfolio project demonstrating end-to-end ML system design, rigorous experimentation, and honest evaluation of results.
+
+**Key Skills Demonstrated**:
+- Feature engineering for fraud detection
+- Two-stage ML system architecture
+- Ablation studies and model validation
+- Handling negative experimental results professionally

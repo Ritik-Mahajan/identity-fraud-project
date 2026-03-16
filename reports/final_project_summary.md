@@ -2,224 +2,299 @@
 
 ## Selective Encoder-Enhanced Identity Fraud Detection for Application Risk
 
-### Executive Summary
+---
 
-This project built and evaluated a two-stage fraud detection system for application/identity fraud. The hypothesis was that lightweight text/encoder features could improve fraud detection on borderline cases where a structured model is uncertain.
+## Executive Overview
 
-**Key Finding**: The structured model alone achieves 99.5% ROC-AUC, and adding text features provides no incremental value. This is a valid negative result that demonstrates rigorous experimental methodology.
+This project designed, built, and rigorously evaluated a two-stage fraud detection system for application/identity fraud. The core hypothesis was that lightweight text/encoder features could improve fraud detection on borderline cases where a structured model is uncertain.
+
+**Bottom Line**: The structured model alone achieves **99.5% ROC-AUC**. Adding text features provides **no incremental value**. This negative result is valuable—it demonstrates that strong feature engineering can eliminate the need for complex NLP, and that disciplined experimentation prevents unnecessary production complexity.
+
+| Key Metric | Value |
+|------------|-------|
+| Best Model | LightGBM (Stage 1 only) |
+| Test ROC-AUC | 0.995 |
+| Test Precision | 96.7% |
+| Test Recall | 89.0% |
+| Stage 2 Improvement | None (0.0%) |
 
 ---
 
-## Project Overview
+## Business Problem
+
+### The Challenge
+
+Application fraud—where fraudsters submit fake or stolen identities to open accounts—costs financial institutions billions annually. The detection challenge involves:
+
+1. **High precision**: Minimize false positives that frustrate legitimate customers
+2. **High recall**: Catch as much fraud as possible to prevent losses
+3. **Borderline handling**: Ambiguous cases require expensive manual review
+
+### Why This Project Matters
+
+- Demonstrates realistic fraud detection system design
+- Tests a production-relevant architecture (selective text analysis)
+- Shows rigorous validation methodology
+- Provides honest assessment of when complexity helps vs. hurts
+
+---
+
+## Data Design
+
+### Why Synthetic Data?
+
+Real fraud data is sensitive, imbalanced, and proprietary. Synthetic data enables:
+- Full control over fraud patterns and difficulty levels
+- Reproducible experiments
+- Shareable portfolio project
+
+### Dataset Specifications
 
 | Attribute | Value |
 |-----------|-------|
-| **Project Name** | Selective Encoder-Enhanced Identity Fraud Detection |
-| **Duration** | 13 phases |
-| **Dataset** | 5,000 synthetic applications |
-| **Fraud Rate** | 12% |
-| **Best Model** | LightGBM (Stage 1) |
-| **Best ROC-AUC** | 0.995 |
+| Total Applications | 5,000 |
+| Fraud Rate | 12% |
+| Time Span | 12 months |
+| Split Strategy | Time-based (70/15/15) |
+
+### Fraud Archetypes
+
+| Type | Proportion | Characteristics |
+|------|------------|-----------------|
+| Legitimate Clean | 70% | Consistent identity, normal behavior |
+| Legitimate Noisy | 18% | Real customers with messy data |
+| Synthetic Identity | 5% | Fabricated, stitched-together identities |
+| True-Name Fraud | 4% | Real identity, fraudulent intent |
+| Coordinated Attack | 3% | Organized fraud rings |
 
 ---
 
-## System Architecture
+## Modeling Approach
+
+### Two-Stage Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        APPLICATION                               │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    STAGE 1: STRUCTURED MODEL                     │
-│                                                                  │
-│  Features: device_velocity, identity_reuse, tenure, thin_file   │
-│  Model: LightGBM                                                 │
-│  Performance: 99.5% ROC-AUC                                      │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────┐
-                    │ CONFIDENCE CHECK │
-                    │  Score in        │
-                    │  [0.01, 0.99]?   │
-                    └─────────────────┘
-                     /              \
-                   NO                YES
-                   /                  \
-                  ▼                    ▼
-┌──────────────────────┐    ┌──────────────────────┐
-│  USE STAGE 1 SCORE   │    │  STAGE 2: TEXT MODEL │
-│  (97.7% of cases)    │    │  (2.3% of cases)     │
-└──────────────────────┘    │                      │
-                            │  Features: OCR sim,  │
-                            │  keyword counts,     │
-                            │  text lengths        │
-                            │                      │
-                            │  Model: Logistic     │
-                            │  Regression combiner │
-                            └──────────────────────┘
+Application → Stage 1 (Structured) → Confident? → Yes → Use Stage 1
+                                         ↓
+                                        No (2.3%)
+                                         ↓
+                                Stage 2 (Text) → Combined
 ```
+
+### Stage 1: Structured Model
+
+**23 engineered features** across categories:
+- **Velocity**: Device reuse (7d), email/phone/address reuse (30d)
+- **Tenure**: Months at address, months at employer
+- **Risk flags**: Thin file, night application, high identity reuse
+- **Derived**: Income/age ratio, name-email match score
+
+**Model**: LightGBM (selected over Logistic Regression and XGBoost)
+
+### Stage 2: Text/Encoder Model
+
+**12 text-based features** using MiniLM encoder:
+- OCR similarity (claimed identity vs document text)
+- Employment/address consistency scores
+- Suspicious keyword counts
+- Text length indicators
+
+**Combiner**: Logistic Regression on Stage 1 score + text features
 
 ---
 
-## Key Results
+## Stage 1 Results
 
-### Overall Performance (Test Set)
+### Model Comparison
 
-| Model | ROC-AUC | PR-AUC | Precision | Recall | F1 |
-|-------|---------|--------|-----------|--------|-----|
-| **LightGBM (Stage 1)** | **0.995** | **0.974** | **96.7%** | **89.0%** | **0.927** |
-| Borderline Routed | 0.993 | 0.966 | 96.7% | 89.0% | 0.927 |
-| Combined (All Cases) | 0.957 | 0.948 | 96.7% | 89.0% | 0.927 |
-| Text Only | 0.818 | 0.755 | 72.2% | 68.4% | 0.703 |
+| Model | Test ROC-AUC | Test PR-AUC | Test F1 |
+|-------|--------------|-------------|---------|
+| **LightGBM** | **0.995** | **0.974** | **0.927** |
+| XGBoost | 0.992 | 0.960 | 0.889 |
+| Logistic Regression | 0.988 | 0.944 | 0.831 |
 
-### Borderline Performance (Test Set)
+### Feature Importance
 
-| Model | ROC-AUC | Error Reduction |
-|-------|---------|-----------------|
-| LightGBM (Baseline) | 0.814 | — |
+Most discriminative features:
+1. `high_identity_reuse_flag`: 67% fraud rate when true (vs 1.4% false)
+2. `high_device_velocity_flag`: Only appears in fraud cases
+3. `night_application_flag`: 7x higher in fraud
+4. `tenure_min`: 5x lower in fraud (6 vs 34 months)
+
+### Key Insight
+
+The structured features capture the vast majority of fraud signal. With 99.5% ROC-AUC, there is very little room for improvement.
+
+---
+
+## Stage 2 Results
+
+### Ablation Study
+
+| Setup | Description | ROC-AUC | Delta |
+|-------|-------------|---------|-------|
+| 1 | Structured Only | **0.995** | — |
+| 2 | Text Only | 0.818 | -0.177 |
+| 3 | Combined (All Cases) | 0.957 | **-0.038** |
+| 4 | Borderline Routed | 0.993 | -0.002 |
+
+### Critical Finding
+
+**Adding text features to all cases HURTS performance** (0.995 → 0.957).
+
+The text features dilute the strong structured signal rather than enhancing it.
+
+### Borderline-Specific Analysis
+
+| Setup | Borderline ROC-AUC | Error Reduction |
+|-------|-------------------|-----------------|
+| Structured Only | 0.814 | — |
 | Combined | 0.790 | 0.0% |
-| Borderline Routed | 0.790 | 0.0% |
+| Routed | 0.790 | 0.0% |
+
+Even on borderline cases—where Stage 2 was designed to help—there is **no improvement**.
+
+### Why Stage 2 Didn't Help
+
+1. **Strong baseline**: 99.5% ROC-AUC leaves almost no room for improvement
+2. **Feature correlation**: Text features capture similar patterns as structured features
+3. **Small borderline set**: Only 117 cases (45 in test) limited Stage 2 learning
+4. **Training limitation**: Training split had 0 fraud cases in borderline band
 
 ---
 
-## Key Findings
+## Validation Findings
 
-### 1. Structured Features Are Sufficient
+### Threshold Analysis
 
-The engineered structured features capture most fraud signal:
-- `high_identity_reuse_flag`: 67% fraud rate when true (vs 1.4% when false)
-- `high_device_velocity_flag`: Only appears in fraud cases
-- `night_application_flag`: 7x higher in fraud
+Performance is stable across operating points:
 
-### 2. Text Features Provide No Incremental Value
+| Threshold | Precision | Recall | F1 |
+|-----------|-----------|--------|-----|
+| 0.3 | 93.8% | 91.0% | 0.924 |
+| 0.5 | 96.7% | 89.0% | 0.927 |
+| 0.7 | 97.8% | 89.0% | 0.932 |
 
-- Adding text to all cases **hurts** performance (0.995 → 0.957 ROC-AUC)
-- Borderline routing preserves performance but doesn't improve it
-- Text features are correlated with structured features
+### Calibration
 
-### 3. Borderline Routing Is the Safest Architecture
+| Model | Brier Score | Interpretation |
+|-------|-------------|----------------|
+| LightGBM | 0.0146 | Well-calibrated |
+| Combined | 0.0158 | Slightly worse |
 
-If text features must be used:
-- Apply them only to borderline cases (2.3% of traffic)
-- This limits potential "damage" from noisy text features
-- Performance stays close to Stage 1 (0.993 vs 0.995)
+### Stability Over Time
 
-### 4. Strong Baseline Makes Improvement Hard
+| Month | Fraud Rate | Capture Rate |
+|-------|------------|--------------|
+| 2024-11 | 11.9% | 87.8% |
+| 2024-12 | 12.0% | 90.2% |
 
-With 99.5% ROC-AUC, there's very little room for improvement:
-- Only 14 errors on 835 test cases
-- Would need to fix 1-2 errors to show improvement
-- Small borderline set (45 cases) limits statistical power
+Performance is stable across the test period.
 
----
+### Runtime
 
-## Ablation Study Summary
+| Component | Latency |
+|-----------|---------|
+| Stage 1 inference | ~40ms |
+| Encoder features | ~50ms per case |
+| Stage 2 overhead | ~6s total (117 cases) |
 
-| Setup | Description | ROC-AUC | Verdict |
-|-------|-------------|---------|---------|
-| 1 | Structured Only | 0.995 | **Best** |
-| 2 | Text Only | 0.818 | Weak |
-| 3 | Combined (All) | 0.957 | Hurts |
-| 4 | Borderline Routed | 0.993 | Preserves |
+Stage 2 adds computational cost without performance benefit.
 
 ---
 
-## Honest Assessment
-
-### What Worked
-
-✅ Strong structured feature engineering  
-✅ Rigorous experimental design  
-✅ Time-based train/val/test split  
-✅ Comprehensive ablation study  
-✅ Honest reporting of negative results  
-
-### What Didn't Work
-
-❌ Text features didn't improve performance  
-❌ Small borderline set limited Stage 2 learning  
-❌ Training split had 0 fraud in borderline band  
-
-### Limitations
-
-- Synthetic dataset (real patterns may differ)
-- Small borderline subset (45 test cases)
-- Single encoder model (MiniLM only)
-- Simple combiner (Logistic Regression only)
-
----
-
-## Recommendation
+## Final Recommendation
 
 ### For This Dataset
 
 **Use Stage 1 (LightGBM) alone.**
 
-The two-stage architecture adds complexity without improving performance.
+The two-stage architecture adds complexity without improving performance:
+- No accuracy gain
+- Additional model to maintain
+- Encoder dependency (sentence-transformers)
+- Extra latency for borderline cases
 
 ### For Similar Problems
 
-1. Start with strong structured features
-2. Establish a baseline before adding complexity
-3. Test incrementally with ablation studies
-4. Be willing to accept negative results
+1. **Start with strong structured features** before adding complexity
+2. **Establish a baseline** and measure incremental value rigorously
+3. **Use ablation studies** to isolate component contributions
+4. **Accept negative results** when the evidence is clear
+
+### If Text Must Be Used
+
+Use **borderline-only routing**:
+- Limits text analysis to 2.3% of cases
+- Preserves most of Stage 1 performance (0.993 vs 0.995)
+- Contains potential "damage" from noisy features
+
+---
+
+## Lessons Learned
+
+### Technical Lessons
+
+1. **Feature engineering matters more than model complexity**
+   - Well-designed structured features achieved 99.5% ROC-AUC
+   - Text/NLP added no value despite significant effort
+
+2. **Strong baselines make improvement hard**
+   - With only 14 errors on 835 test cases, fixing even 1-2 is statistically challenging
+
+3. **Ablation studies are essential**
+   - Without ablation, we might have deployed unnecessary complexity
+
+### Process Lessons
+
+1. **Validate incrementally**
+   - Test each component's contribution before combining
+
+2. **Be honest about negative results**
+   - "It didn't help" is a valid and valuable finding
+
+3. **Consider operational complexity**
+   - A simpler model that performs equally well is better
+
+### What This Project Demonstrates
+
+- Rigorous experimental methodology
+- Honest evaluation of results
+- Understanding that complexity doesn't always help
+- Production-oriented thinking (latency, maintenance, dependencies)
 
 ---
 
 ## Project Artifacts
 
-### Code
+### Key Files
 
 | File | Description |
 |------|-------------|
-| `src/data_generation.py` | Synthetic data generator |
-| `src/feature_engineering.py` | Structured feature creation |
-| `src/train_baseline_models.py` | Stage 1 model training |
-| `src/define_borderline_band.py` | Borderline band definition |
-| `src/encoder_features.py` | Text feature generation |
-| `src/train_final_combined_model.py` | Stage 2 model training |
-| `src/validate_models.py` | Comprehensive validation |
-
-### Models
-
-| File | Description |
-|------|-------------|
-| `models/lightgbm_model.pkl` | Best Stage 1 model |
-| `models/logistic_regression.pkl` | Baseline structured model |
-| `models/final_combined_logistic_regression.pkl` | Stage 2 combiner |
-
-### Data
-
-| File | Description |
-|------|-------------|
-| `data/processed/applications_cleaned.parquet` | Cleaned dataset |
-| `data/processed/structured_features.parquet` | Feature table |
-| `data/processed/baseline_predictions.parquet` | Stage 1 predictions |
-| `data/processed/text_encoder_features.parquet` | Text features |
+| `models/lightgbm_model.pkl` | Production-ready model |
 | `data/processed/final_model_predictions.parquet` | All predictions |
+| `reports/model_validation_summary.md` | Validation details |
+| `notebooks/09_model_validation.ipynb` | Interactive validation |
 
-### Reports
+### Code Modules
 
-| File | Description |
-|------|-------------|
-| `reports/project_interpretation.md` | Detailed interpretation |
-| `reports/model_validation_summary.md` | Validation findings |
-| `reports/final_model_summary.md` | Phase 10 summary |
-| `reports/future_improvements.md` | Next steps |
+| Module | Purpose |
+|--------|---------|
+| `src/data_generation.py` | Synthetic data creation |
+| `src/feature_engineering.py` | Structured feature pipeline |
+| `src/train_baseline_models.py` | Stage 1 training |
+| `src/encoder_features.py` | Text feature generation |
+| `src/validate_models.py` | Comprehensive validation |
 
 ---
 
 ## Conclusion
 
-This project successfully tested the hypothesis that text features could improve fraud detection on borderline cases. The evidence shows that for this dataset, the hypothesis does not hold—the structured model is already strong enough that text features provide no additional value.
+This project successfully tested the hypothesis that text features could improve fraud detection on borderline cases. The evidence clearly shows that for this dataset, the hypothesis does not hold.
 
-**This is a valuable finding.** The project demonstrates:
-- Rigorous experimental methodology
-- Honest evaluation of results
-- Understanding that complexity doesn't always help
-- The importance of strong feature engineering
+**This is a valuable outcome.** The project demonstrates:
+- How to design and validate a production ML system
+- When to accept that simpler is better
+- How to communicate negative results professionally
 
-The methodology is transferable to other problems where the question is: "Does adding X improve performance?"
+The methodology is directly transferable to any problem where you need to validate whether added complexity provides value.
