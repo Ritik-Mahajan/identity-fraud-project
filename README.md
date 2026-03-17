@@ -4,7 +4,7 @@
 
 A production-oriented fraud detection system that tests whether lightweight text/encoder features can improve fraud detection on borderline cases where structured models are uncertain.
 
-**Key Result**: The structured model achieves **99.5% ROC-AUC**. Text features provide **no incremental value**—a valid negative result demonstrating rigorous experimental methodology.
+**Key Result**: The structured model achieves **99.5% ROC-AUC**. Text features provide **no incremental value**—a valid negative result demonstrating rigorous experimental methodology. Maybe it will work with real-world public data and encoder models trained specifically for this use case.
 
 ---
 
